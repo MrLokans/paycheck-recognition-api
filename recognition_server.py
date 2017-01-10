@@ -1,3 +1,4 @@
+import logging
 import os
 
 from flask import (
@@ -7,8 +8,16 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-UPLOAD_FOLDER = '{}/uploads/'.format(os.getcwd())
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('recognizer.flask')
+
+if not os.path.exists(UPLOAD_FOLDER):
+    logger.info("Upload dir ({}) does not exist, creating."
+                .format(UPLOAD_FOLDER))
+    os.mkdir(UPLOAD_FOLDER)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -23,16 +32,16 @@ def allowed_file(filename):
 def recognize():
     if request.method == 'POST':
         # check if the post request has the file part
-        print(request.files)
         file = request.files.get('picture')
-        if file is None:
-            return jsonify({'error': 'No selected file'})
-        if file.filename == '':
+        if file is None or file.filename == '':
             return jsonify({'error': 'No selected file'})
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            return jsonify({"status": "file {} successfully uploaded".format(file.filename)})
+            output_fname = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            res = file.save(output_fname)
+            # TODO (mrlokans) add celery/RQ task
+            return jsonify({"status": "file {} successfully uploaded"
+                                      .format(file.filename)})
     return '''
     <!doctype html>
     <title>Upload new File</title>
